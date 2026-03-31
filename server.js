@@ -38,11 +38,26 @@ if (RENDER_URL) {
     console.log('🤖 Telegram bot running in POLLING mode (dev)');
 }
 
+// Set bot menu commands
+bot.setMyCommands([
+    { command: 'log', description: 'Log a new study topic' },
+    { command: 'cancel', description: 'Cancel current action' }
+]).catch(console.error);
+
+// ─── State Tracking for Bot ──────────────────
+const userStates = {};
+
 // ─── Utility ─────────────────────────────────
 
 function getToday() {
     // Use IST timezone for date calculations
     const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function addDays(dateStr, days) {
+    const d = new Date(dateStr + 'T00:00:00');
+    d.setDate(d.getDate() + days);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
@@ -116,6 +131,89 @@ bot.onText(/^\/start$/, async (msg) => {
         '🔗 Please use the link from the website to connect your account.',
         { parse_mode: 'Markdown' }
     );
+});
+
+bot.onText(/^\/cancel$/, async (msg) => {
+    const chatId = msg.chat.id;
+    if (userStates[chatId]) {
+        delete userStates[chatId];
+        await bot.sendMessage(chatId, '🚫 Logging cancelled.', { reply_markup: { remove_keyboard: true } });
+    } else {
+        await bot.sendMessage(chatId, 'Nothing to cancel.');
+    }
+});
+
+bot.onText(/^\/log$/, async (msg) => {
+    const chatId = msg.chat.id;
+    
+    try {
+        const user = await User.findOne({ chatId, linked: true });
+        if (!user) {
+            return await bot.sendMessage(chatId, '❌ You need to link your account first! Please use the link on the website.');
+        }
+
+        userStates[chatId] = { step: 'subject', linkCode: user.linkCode };
+        await bot.sendMessage(chatId, '📝 *Let\'s log a study topic!*\n\nWhat *Subject* did you study?', { parse_mode: 'Markdown' });
+    } catch (e) {
+        console.error('Error starting log:', e);
+    }
+});
+
+bot.on('message', async (msg) => {
+    const chatId = msg.chat.id;
+    const text = msg.text;
+
+    // Ignore commands manually
+    if (!text || text.startsWith('/')) return;
+
+    const state = userStates[chatId];
+    if (!state) return; // Not in a conversation
+
+    // Strip markdown chars so they don't break our bot formatting
+    const safeText = text.trim().replace(/[*_`\[\]()]/g, '');
+
+    try {
+        if (state.step === 'subject') {
+            state.subject = safeText;
+            state.step = 'topic';
+            await bot.sendMessage(chatId, `Got it. Subject: *${state.subject}*\n\nWhat *Topic / Chapter* did you cover?`, { parse_mode: 'Markdown' });
+        } 
+        else if (state.step === 'topic') {
+            state.topic = safeText;
+            state.step = 'notes';
+            await bot.sendMessage(chatId, `Great! Topic: *${state.topic}*\n\nAny *Notes*? (Type 'skip' to leave blank)`, { parse_mode: 'Markdown' });
+        } 
+        else if (state.step === 'notes') {
+            const notes = safeText.toLowerCase() === 'skip' ? '' : safeText;
+            const today = getToday();
+            
+            await Entry.create({
+                linkCode: state.linkCode,
+                date: today,
+                subject: state.subject,
+                topic: state.topic,
+                notes: notes,
+                revisions: {
+                    day4: { dueDate: addDays(today, 3), completed: false, completedAt: null },
+                    day7: { dueDate: addDays(today, 6), completed: false, completedAt: null }
+                }
+            });
+
+            delete userStates[chatId];
+
+            await bot.sendMessage(chatId, 
+                `✅ *Topic logged successfully!*\n\n` +
+                `*Subject:* ${state.subject}\n` +
+                `*Topic:* ${state.topic}\n\n` +
+                `📅 Revisions scheduled for *Day 4* and *Day 7*! You can view this on the website.`,
+                { parse_mode: 'Markdown' }
+            );
+        }
+    } catch (error) {
+        console.error('Logging flow error:', error);
+        delete userStates[chatId];
+        await bot.sendMessage(chatId, '⚠️ Something went wrong while saving. Please try again with /log.');
+    }
 });
 
 // ─── API Routes ──────────────────────────────
