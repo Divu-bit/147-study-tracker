@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>147 Study — Smart Revision Tracker</title>
+    <meta name="description" content="Track your studies with the 1-4-7 spaced repetition method. Log topics, get automatic revision reminders via Telegram.">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Animated Background -->
+    <div class="bg-orb bg-orb-1"></div>
+    <div class="bg-orb bg-orb-2"></div>
+    <div class="bg-orb bg-orb-3"></div>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <h1 class="logo">✦ 147 Study</h1>
+                <p class="tagline">Spaced Repetition Tracker</p>
+            </div>
+            <div class="header-right">
+                <div class="streak-badge">
+                    <span class="streak-icon">🔥</span>
+                    <span class="streak-count" id="streakCount">0</span>
+                    <span class="streak-label">day streak</span>
+                </div>
+                <button class="telegram-btn" id="telegramBtn" title="Link Telegram">
+                    <span id="telegramIcon">📬</span>
+                    <span id="telegramLabel">Link Telegram</span>
+                </button>
+                <button class="btn-logout" id="logoutBtn" title="Logout" style="display: none;">
+                    🚪 Logout
+                </button>
+                <button class="btn-danger-sm" id="deleteAccountBtn" title="Delete Account" style="display: none;">
+                    🗑️
+                </button>
+            </div>
+        </header>
+
+        <!-- Telegram Banner (shown when not linked) -->
+        <div class="telegram-banner" id="telegramBanner">
+            <div class="telegram-banner-content">
+                <span class="telegram-banner-icon">📬</span>
+                <div>
+                    <strong>Connect Telegram</strong>
+                    <p>Get daily revision reminders automatically at 8 AM!</p>
+                </div>
+            </div>
+            <button class="telegram-banner-btn" id="telegramBannerBtn">Link Now →</button>
+        </div>
+
+        <!-- Stats Bar -->
+        <section class="stats-bar">
+            <div class="stat-card">
+                <span class="stat-value" id="statTopics">0</span>
+                <span class="stat-label">Topics Logged</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="statRevised">0</span>
+                <span class="stat-label">Revisions Done</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="statPending">0</span>
+                <span class="stat-label">Pending Today</span>
+            </div>
+        </section>
+
+        <!-- Main Layout -->
+        <div class="main-layout">
+            <div class="main-content">
+                <!-- Tabs -->
+                <nav class="tabs" id="tabs">
+                    <button class="tab active" data-tab="today" id="tabToday">Today <span class="tab-badge" id="todayBadge">0</span></button>
+                    <button class="tab" data-tab="upcoming" id="tabUpcoming">Upcoming</button>
+                    <button class="tab" data-tab="all" id="tabAll">All Entries</button>
+                    <button class="tab" data-tab="completed" id="tabCompleted">Completed</button>
+                </nav>
+
+                <!-- Content -->
+                <div class="content" id="content">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⏳</div>
+                        <div class="empty-state-title">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Calendar Sidebar -->
+            <aside class="calendar-section">
+                <div class="calendar-header">
+                    <button class="cal-nav" id="calPrev">‹</button>
+                    <span id="calTitle">March 2026</span>
+                    <button class="cal-nav" id="calNext">›</button>
+                </div>
+                <div class="calendar-days" id="calendarGrid"></div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- FAB -->
+    <button class="fab" id="addBtn" title="Log a study topic">+</button>
+
+    <!-- Add Entry Modal -->
+    <div class="modal-overlay" id="addModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>📝 Log Study Topic</h2>
+                <button class="modal-close" id="addModalClose">×</button>
+            </div>
+            <form id="addForm">
+                <div class="form-group">
+                    <label for="entrySubject">Subject</label>
+                    <input type="text" id="entrySubject" placeholder="e.g., Physics, History, Biology..." required>
+                </div>
+                <div class="form-group">
+                    <label for="entryTopic">Topic / Chapter</label>
+                    <input type="text" id="entryTopic" placeholder="e.g., Electromagnetic Induction" required>
+                </div>
+                <div class="form-group">
+                    <label for="entryNotes">Notes (optional)</label>
+                    <textarea id="entryNotes" placeholder="Key points, formulas, concepts..." rows="3"></textarea>
+                </div>
+                <div class="form-info">
+                    <span>🟣 Day 4 revision: <strong id="day4Preview">—</strong></span>
+                    <span>🔵 Day 7 revision: <strong id="day7Preview">—</strong></span>
+                </div>
+                <button type="submit" class="btn-primary" id="addSubmitBtn">Log Topic</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

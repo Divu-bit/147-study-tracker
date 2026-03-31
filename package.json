@@ -1,0 +1,18 @@
+{
+  "name": "147-study-tracker",
+  "version": "1.0.0",
+  "description": "1-4-7 Spaced Repetition Study Tracker with Telegram notifications",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "mongoose": "^8.5.0",
+    "node-cron": "^3.0.3",
+    "node-telegram-bot-api": "^0.66.0"
+  }
+}
