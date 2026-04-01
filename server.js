@@ -408,6 +408,19 @@ app.get('/api/cron/notify', async (req, res) => {
                 ];
 
                 try {
+                    const response = await fetch('https://universal-bridge.onrender.com/api/notify', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-api-key': UNIVERSAL_BRIDGE_API_KEY
+                        },
+                        body: JSON.stringify({
+                            targetUserId: user.appUserId,
+                            title: '📚 147 Study - Revisions Due!',
+                            body: `You have ${totalCount} topics waiting for your review.`,
+                            interactiveSchema: schema
+                        })
+                    });
                     
                     if (!response.ok) throw new Error(`Status ${response.status}`);
                     user.lastNotifiedDate = today;
@@ -599,5 +612,3 @@ mongoose.connect(process.env.MONGODB_URI)
         console.error('❌ MongoDB connection failed:', err.message);
         process.exit(1);
     });
-/ /   t r i g g e r   d e p l o y   t o   r e s t o r e   w e b h o o k  
- 
