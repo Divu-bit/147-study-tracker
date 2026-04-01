@@ -70,12 +70,16 @@ function daysBetween(d1, d2) {
 
 bot.onText(/\/start (.+)/, async (msg, match) => {
     const chatId = msg.chat.id;
-    const linkCode = match[1];
+    const linkCode = match[1].trim();
+
+    if (linkCode === 'null' || linkCode === 'undefined' || !linkCode) {
+        return await bot.sendMessage(chatId, '❌ Website connection error. Your browser failed to provide a valid link code. Please refresh the website and try again.');
+    }
 
     try {
         const newUser = await User.findOne({ linkCode });
         if (!newUser) {
-            return await bot.sendMessage(chatId, '❌ Invalid link code. Please use the link from the website.');
+            return await bot.sendMessage(chatId, '❌ Invalid link code. Please use the exact link provided on the website.');
         }
 
         // Check if this Telegram account was previously linked to a DIFFERENT linkCode
