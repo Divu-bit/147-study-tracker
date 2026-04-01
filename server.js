@@ -17,6 +17,7 @@ const BOT_USERNAME = 'Edu147plannerbot';
 const RENDER_URL = process.env.RENDER_URL; // e.g., https://your-app.onrender.com
 const CRON_SECRET = process.env.CRON_SECRET || 'default-secret-change-me';
 const UNIVERSAL_BRIDGE_API_KEY = process.env.UNIVERSAL_BRIDGE_API_KEY;
+const UNIVERSAL_BRIDGE_URL = process.env.UNIVERSAL_BRIDGE_URL || 'https://universal-bridge.onrender.com';
 
 // ─── Telegram Bot Setup ──────────────────────
 // Use WEBHOOK mode in production (Render), POLLING mode locally
@@ -399,7 +400,7 @@ app.get('/api/cron/notify', async (req, res) => {
                 ];
 
                 try {
-                    const response = await fetch('https://universal-bridge.onrender.com/api/notify', {
+                    const response = await fetch(`${UNIVERSAL_BRIDGE_URL}/api/notify`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -478,7 +479,7 @@ app.get('/api/test-notify/:code', async (req, res) => {
                 { type: 'button', label: '✅ I received it!', action: 'test_action', webhookUrl: `${webhookBase}/api/bridge-webhook?code=${user.linkCode}` },
             ];
 
-            const response = await fetch('https://universal-bridge.onrender.com/api/notify', {
+            const response = await fetch(`${UNIVERSAL_BRIDGE_URL}/api/notify`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
