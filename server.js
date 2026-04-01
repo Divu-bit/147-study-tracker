@@ -463,8 +463,46 @@ app.get('/api/cron/notify', async (req, res) => {
     }
 });
 
-// ─── Universal Bridge Webhook Endpoint ────────
+// ─── TEMP: TEST NOTIFICATION ENDPOINT ─────────
+app.get('/api/test-notify/:code', async (req, res) => {
+    try {
+        const user = await User.findOne({ linkCode: req.params.code });
+        if (!user || (!user.linked && !user.appUserId)) {
+             return res.status(404).json({ error: 'User not found or not linked' });
+        }
+        
+        if (user.notificationPreference === 'app') {
+            const webhookBase = RENDER_URL || 'http://localhost:3000';
+            const schema = [
+                { type: 'display_text', label: `🛠️ This is a manual test notification.` },
+                { type: 'button', label: '✅ I received it!', action: 'test_action', webhookUrl: `${webhookBase}/api/bridge-webhook?code=${user.linkCode}` },
+            ];
 
+            const response = await fetch('https://universal-bridge.onrender.com/api/notify', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': UNIVERSAL_BRIDGE_API_KEY
+                },
+                body: JSON.stringify({
+                    targetUserId: user.appUserId,
+                    title: '🛠️ Test Notification',
+                    body: `Your cron integration test is successful.`,
+                    interactiveSchema: schema
+                })
+            });
+            const responseData = await response.json();
+            return res.json({ success: true, API_Status: response.status, API_Response: responseData });
+        } else {
+            await bot.sendMessage(user.chatId, '🛠️ *TEST NOTIFICATION*\n\nYour cron integration is working perfectly!', { parse_mode: 'Markdown' });
+            return res.json({ success: true, type: 'Telegram' });
+        }
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ─── Universal Bridge Webhook Endpoint ────────
 app.post('/api/bridge-webhook', async (req, res) => {
     const { code } = req.query;
     const { action, data } = req.body;
