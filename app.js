@@ -97,6 +97,9 @@ class StudyTracker {
                 const data = await res.json();
                 this.isLinked = data.linked;
                 if (data.preference) this.notificationPreference = data.preference;
+                if (data.notificationTime && this.dom.notificationTimeInput) {
+                    this.dom.notificationTimeInput.value = data.notificationTime;
+                }
             }
         } catch (e) {
             console.error('Failed to check link status:', e);
@@ -215,6 +218,8 @@ class StudyTracker {
             deleteAccountBtn: document.getElementById('deleteAccountBtn'),
             setupModal: document.getElementById('setupModal'),
             setupModalClose: document.getElementById('setupModalClose'),
+            notificationTimeInput: document.getElementById('notificationTimeInput'),
+            saveTimeBtn: document.getElementById('saveTimeBtn'),
             optTelegram: document.getElementById('optTelegram'),
             optApp: document.getElementById('optApp'),
             appSetupForm: document.getElementById('appSetupForm'),
@@ -262,6 +267,7 @@ class StudyTracker {
         if (this.dom.optTelegram) this.dom.optTelegram.addEventListener('click', () => this.openTelegramLink());
         if (this.dom.optApp) this.dom.optApp.addEventListener('click', () => { this.dom.appSetupForm.style.display = 'block'; });
         if (this.dom.saveAppIdBtn) this.dom.saveAppIdBtn.addEventListener('click', () => this.handleLinkApp());
+        if (this.dom.saveTimeBtn) this.dom.saveTimeBtn.addEventListener('click', () => this.handleSaveTime());
 
         // Logout & Delete Account
         this.dom.logoutBtn.addEventListener('click', () => this.handleLogout());
@@ -301,14 +307,34 @@ class StudyTracker {
     // ─── Setup UI ─────────────────────────
 
     openSetupModal() {
-        if (this.isLinked) return;
         this.openModal('setupModal');
     }
 
     openTelegramLink() {
-        if (this.isLinked) return;
         const link = this.botLink || `https://t.me/Edu147plannerbot?start=${this.linkCode}`;
         window.open(link, '_blank');
+    }
+
+    async handleSaveTime() {
+        if (!this.linkCode) return;
+        const time = this.dom.notificationTimeInput.value;
+        try {
+            const res = await fetch('/api/user/settings', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ linkCode: this.linkCode, notificationTime: time })
+            });
+
+            if (res.ok) {
+                this.showToast('✅ Reminder time updated successfully!');
+                this.closeModal('setupModal');
+            } else {
+                this.showToast('Failed to update time.', 'error');
+            }
+        } catch (e) {
+            console.error(e);
+            this.showToast('Network error updating time.', 'error');
+        }
     }
 
     async handleLinkApp() {

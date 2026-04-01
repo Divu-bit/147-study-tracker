@@ -55,9 +55,20 @@
         <div class="modal-overlay" id="setupModal">
             <div class="modal">
                 <div class="modal-header">
-                    <h2>📬 Setup Daily Alerts</h2>
+                    <h2>📬 Alert Settings</h2>
                     <button class="modal-close" id="setupModalClose">×</button>
                 </div>
+                
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="notificationTimeInput"><strong>Daily Reminder Time (IST)</strong></label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="time" id="notificationTimeInput" value="09:00" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.05); color: #FFF;" />
+                        <button class="btn-primary" id="saveTimeBtn" style="padding: 8px 15px;">Save Time</button>
+                    </div>
+                </div>
+
+                <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 20px 0;">
+
                 <div class="setup-options">
                     <div class="setup-option" id="optTelegram">
                         <div class="opt-icon">🚀</div>

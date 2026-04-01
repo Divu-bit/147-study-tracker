@@ -236,7 +236,7 @@ app.get('/api/link-status/:code', async (req, res) => {
     try {
         const user = await User.findOne({ linkCode: req.params.code });
         if (!user) return res.status(404).json({ error: 'Not found' });
-        res.json({ linked: user.linked, preference: user.notificationPreference });
+        res.json({ linked: user.linked, preference: user.notificationPreference, notificationTime: user.notificationTime });
     } catch (error) {
         res.status(500).json({ error: 'Failed to check status' });
     }
@@ -258,6 +258,22 @@ app.post('/api/link-app', async (req, res) => {
     } catch (error) {
         console.error('App link error:', error);
         res.status(500).json({ error: 'Failed to link app' });
+    }
+});
+
+// Update user settings
+app.put('/api/user/settings', async (req, res) => {
+    try {
+        const { linkCode, notificationTime } = req.body;
+        const user = await User.findOne({ linkCode });
+        if (!user) return res.status(404).json({ error: 'Not found' });
+        
+        if (notificationTime) user.notificationTime = notificationTime;
+        await user.save();
+        
+        res.json({ success: true, notificationTime: user.notificationTime });
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to update settings' });
     }
 });
 
@@ -336,9 +352,17 @@ app.get('/api/cron/notify', async (req, res) => {
     try {
         const users = await User.find({ linked: true });
         const today = getToday();
+        const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+        const currentTime = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        
         let notified = 0;
 
         for (const user of users) {
+            if (user.lastNotifiedDate === today) continue; // Already notified today
+            
+            const userTime = user.notificationTime || '09:00';
+            if (currentTime < userTime) continue; // Not time yet
+
             const entries = await Entry.find({ linkCode: user.linkCode });
             const dueToday = [];
             const overdue = [];
@@ -390,6 +414,8 @@ app.get('/api/cron/notify', async (req, res) => {
                     });
                     
                     if (!response.ok) throw new Error(`Status ${response.status}`);
+                    user.lastNotifiedDate = today;
+                    await user.save();
                     notified++;
                 } catch (e) {
                     console.error(`  ❌ Failed to notify app user ${user.linkCode}:`, e.message);
@@ -420,6 +446,8 @@ app.get('/api/cron/notify', async (req, res) => {
 
                 try {
                     await bot.sendMessage(user.chatId, msg, { parse_mode: 'Markdown' });
+                    user.lastNotifiedDate = today;
+                    await user.save();
                     notified++;
                 } catch (e) {
                     console.error(`  ❌ Failed to notify telegram user ${user.linkCode}:`, e.message);
