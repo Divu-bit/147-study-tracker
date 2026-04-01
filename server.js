@@ -408,19 +408,6 @@ app.get('/api/cron/notify', async (req, res) => {
                 ];
 
                 try {
-                    const response = await fetch('https://universal-bridge.onrender.com/api/notify', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'x-api-key': UNIVERSAL_BRIDGE_API_KEY
-                        },
-                        body: JSON.stringify({
-                            targetUserId: user.appUserId,
-                            title: '📚 147 Study - Revisions Due!',
-                            body: `You have ${totalCount} topics waiting for your review.`,
-                            interactiveSchema: schema
-                        })
-                    });
                     
                     if (!response.ok) throw new Error(`Status ${response.status}`);
                     user.lastNotifiedDate = today;
