@@ -246,6 +246,15 @@ app.get('/api/link-status/:code', async (req, res) => {
 app.post('/api/link-app', async (req, res) => {
     try {
         const { linkCode, appUserId } = req.body;
+        
+        // 1. Check if this appUserId is ALREADY attached to an account
+        const existingAppUser = await User.findOne({ appUserId, linked: true });
+        
+        if (existingAppUser && existingAppUser.linkCode !== linkCode) {
+            // Return existing link code so device can sync/login
+            return res.json({ success: true, isLogin: true, existingLinkCode: existingAppUser.linkCode });
+        }
+
         const user = await User.findOne({ linkCode });
         if (!user) return res.status(404).json({ error: 'Not found' });
 

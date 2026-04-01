@@ -349,6 +349,15 @@ class StudyTracker {
             });
 
             if (res.ok) {
+                const data = await res.json();
+                
+                if (data.isLogin && data.existingLinkCode) {
+                    localStorage.setItem('147_linkCode', data.existingLinkCode);
+                    this.showToast('✅ Logged in successfully! Syncing data...');
+                    setTimeout(() => window.location.reload(), 1500);
+                    return;
+                }
+
                 this.isLinked = true;
                 this.notificationPreference = 'app';
                 this.closeModal('setupModal');
