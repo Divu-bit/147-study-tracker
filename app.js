@@ -50,6 +50,7 @@ class StudyTracker {
         this.entries = [];
         this.linkCode = localStorage.getItem('147_linkCode') || null;
         this.isLinked = false;
+        this.notificationPreference = 'telegram';
         this.currentTab = 'today';
         this.calYear = new Date().getFullYear();
         this.calMonth = new Date().getMonth();
@@ -95,6 +96,7 @@ class StudyTracker {
             if (res.ok) {
                 const data = await res.json();
                 this.isLinked = data.linked;
+                if (data.preference) this.notificationPreference = data.preference;
             }
         } catch (e) {
             console.error('Failed to check link status:', e);
@@ -210,7 +212,14 @@ class StudyTracker {
             telegramBanner: document.getElementById('telegramBanner'),
             telegramBannerBtn: document.getElementById('telegramBannerBtn'),
             logoutBtn: document.getElementById('logoutBtn'),
-            deleteAccountBtn: document.getElementById('deleteAccountBtn')
+            deleteAccountBtn: document.getElementById('deleteAccountBtn'),
+            setupModal: document.getElementById('setupModal'),
+            setupModalClose: document.getElementById('setupModalClose'),
+            optTelegram: document.getElementById('optTelegram'),
+            optApp: document.getElementById('optApp'),
+            appSetupForm: document.getElementById('appSetupForm'),
+            appUserIdInput: document.getElementById('appUserIdInput'),
+            saveAppIdBtn: document.getElementById('saveAppIdBtn')
         };
     }
 
@@ -240,9 +249,19 @@ class StudyTracker {
             this.handleAddEntry();
         });
 
-        // Telegram link
-        this.dom.telegramBtn.addEventListener('click', () => this.openTelegramLink());
-        this.dom.telegramBannerBtn.addEventListener('click', () => this.openTelegramLink());
+        // Setup Options
+        if (this.dom.telegramBtn) this.dom.telegramBtn.addEventListener('click', () => this.openSetupModal());
+        if (this.dom.telegramBannerBtn) this.dom.telegramBannerBtn.addEventListener('click', () => this.openSetupModal());
+
+        if (this.dom.setupModalClose) this.dom.setupModalClose.addEventListener('click', () => this.closeModal('setupModal'));
+        if (this.dom.setupModal) {
+            this.dom.setupModal.addEventListener('click', (e) => {
+                if (e.target === this.dom.setupModal) this.closeModal('setupModal');
+            });
+        }
+        if (this.dom.optTelegram) this.dom.optTelegram.addEventListener('click', () => this.openTelegramLink());
+        if (this.dom.optApp) this.dom.optApp.addEventListener('click', () => { this.dom.appSetupForm.style.display = 'block'; });
+        if (this.dom.saveAppIdBtn) this.dom.saveAppIdBtn.addEventListener('click', () => this.handleLinkApp());
 
         // Logout & Delete Account
         this.dom.logoutBtn.addEventListener('click', () => this.handleLogout());
@@ -279,7 +298,12 @@ class StudyTracker {
         });
     }
 
-    // ─── Telegram UI ─────────────────────────
+    // ─── Setup UI ─────────────────────────
+
+    openSetupModal() {
+        if (this.isLinked) return;
+        this.openModal('setupModal');
+    }
 
     openTelegramLink() {
         if (this.isLinked) return;
@@ -287,21 +311,48 @@ class StudyTracker {
         window.open(link, '_blank');
     }
 
+    async handleLinkApp() {
+        const appUserId = this.dom.appUserIdInput.value.trim();
+        if (!appUserId) return this.showToast('Please enter an App User ID', 'error');
+
+        try {
+            const res = await fetch('/api/link-app', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ linkCode: this.linkCode, appUserId })
+            });
+
+            if (res.ok) {
+                this.isLinked = true;
+                this.notificationPreference = 'app';
+                this.closeModal('setupModal');
+                this.updateTelegramUI();
+                this.showToast('✅ Mobile App linked successfully!');
+                if (this.linkPollInterval) clearInterval(this.linkPollInterval);
+            } else {
+                this.showToast('Failed to link App. Try again.', 'error');
+            }
+        } catch (e) {
+            console.error(e);
+            this.showToast('Network error linking App.', 'error');
+        }
+    }
+
     updateTelegramUI() {
         if (this.isLinked) {
             this.dom.telegramIcon.textContent = '✅';
-            this.dom.telegramLabel.textContent = 'Connected';
+            this.dom.telegramLabel.textContent = this.notificationPreference === 'app' ? 'App Linked' : 'Connected';
             this.dom.telegramBtn.classList.add('linked');
-            this.dom.telegramBanner.style.display = 'none';
-            this.dom.logoutBtn.style.display = 'flex';
-            this.dom.deleteAccountBtn.style.display = 'flex';
+            if (this.dom.telegramBanner) this.dom.telegramBanner.style.display = 'none';
+            if (this.dom.logoutBtn) this.dom.logoutBtn.style.display = 'flex';
+            if (this.dom.deleteAccountBtn) this.dom.deleteAccountBtn.style.display = 'flex';
         } else {
             this.dom.telegramIcon.textContent = '📬';
-            this.dom.telegramLabel.textContent = 'Link Telegram';
+            this.dom.telegramLabel.textContent = 'Setup Alerts';
             this.dom.telegramBtn.classList.remove('linked');
-            this.dom.telegramBanner.style.display = 'flex';
-            this.dom.logoutBtn.style.display = 'none';
-            this.dom.deleteAccountBtn.style.display = 'none';
+            if (this.dom.telegramBanner) this.dom.telegramBanner.style.display = 'flex';
+            if (this.dom.logoutBtn) this.dom.logoutBtn.style.display = 'none';
+            if (this.dom.deleteAccountBtn) this.dom.deleteAccountBtn.style.display = 'none';
         }
     }
 

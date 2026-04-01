@@ -16,6 +16,7 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const BOT_USERNAME = 'Edu147plannerbot';
 const RENDER_URL = process.env.RENDER_URL; // e.g., https://your-app.onrender.com
 const CRON_SECRET = process.env.CRON_SECRET || 'default-secret-change-me';
+const UNIVERSAL_BRIDGE_API_KEY = process.env.UNIVERSAL_BRIDGE_API_KEY;
 
 // ─── Telegram Bot Setup ──────────────────────
 // Use WEBHOOK mode in production (Render), POLLING mode locally
@@ -230,14 +231,33 @@ app.post('/api/link', async (req, res) => {
     }
 });
 
-// Check if a link code has been connected to Telegram
+// Check if a link code has been connected to a device
 app.get('/api/link-status/:code', async (req, res) => {
     try {
         const user = await User.findOne({ linkCode: req.params.code });
         if (!user) return res.status(404).json({ error: 'Not found' });
-        res.json({ linked: user.linked });
+        res.json({ linked: user.linked, preference: user.notificationPreference });
     } catch (error) {
         res.status(500).json({ error: 'Failed to check status' });
+    }
+});
+
+// Link Universal Bridge App
+app.post('/api/link-app', async (req, res) => {
+    try {
+        const { linkCode, appUserId } = req.body;
+        const user = await User.findOne({ linkCode });
+        if (!user) return res.status(404).json({ error: 'Not found' });
+
+        user.appUserId = appUserId;
+        user.notificationPreference = 'app';
+        user.linked = true;
+        user.linkedAt = new Date();
+        await user.save();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('App link error:', error);
+        res.status(500).json({ error: 'Failed to link app' });
     }
 });
 
@@ -334,32 +354,76 @@ app.get('/api/cron/notify', async (req, res) => {
 
             if (dueToday.length === 0 && overdue.length === 0) continue;
 
-            let msg = '📚 *147 Study — Today\'s Revisions*\n\n';
-            const d4Items = dueToday.filter(i => i.type === 'day4');
-            const d7Items = dueToday.filter(i => i.type === 'day7');
+            const totalCount = dueToday.length + overdue.length;
+            const webhookBase = RENDER_URL || 'http://localhost:3000'; // fallback for local
 
-            if (d4Items.length) {
-                msg += '🟣 *Day 4 Revisions:*\n';
-                d4Items.forEach(i => { msg += `  • ${i.entry.subject} — ${i.entry.topic}\n`; });
-                msg += '\n';
-            }
-            if (d7Items.length) {
-                msg += '🔵 *Day 7 Revisions:*\n';
-                d7Items.forEach(i => { msg += `  • ${i.entry.subject} — ${i.entry.topic}\n`; });
-                msg += '\n';
-            }
-            if (overdue.length) {
-                msg += '🔴 *Overdue:*\n';
-                overdue.forEach(i => { msg += `  • ${i.entry.subject} — ${i.entry.topic} (${i.days}d overdue)\n`; });
-                msg += '\n';
-            }
-            msg += '💪 Good luck with your revisions!';
+            if (user.notificationPreference === 'app') {
+                // Universal Bridge App specific payload
+                if (!user.appUserId || !UNIVERSAL_BRIDGE_API_KEY) {
+                    console.error('Missing appUserId or API key for user:', user.linkCode);
+                    continue;
+                }
 
-            try {
-                await bot.sendMessage(user.chatId, msg, { parse_mode: 'Markdown' });
-                notified++;
-            } catch (e) {
-                console.error(`  ❌ Failed to notify user ${user.linkCode}:`, e.message);
+                const schema = [
+                    { type: 'display_text', label: `You have ${totalCount} topics pending revision today.` },
+                    { type: 'button', label: '✅ Mark Due Revisions Done', action: 'mark_done', webhookUrl: `${webhookBase}/api/bridge-webhook?code=${user.linkCode}` },
+                    { type: 'display_text', label: '--- Log New Topic ---' },
+                    { type: 'text_input', id: 'subject', label: 'Subject' },
+                    { type: 'text_input', id: 'topic', label: 'Topic / Chapter' },
+                    { type: 'text_input', id: 'notes', label: 'Notes (Optional)' },
+                    { type: 'button', label: '📝 Log New Topic', action: 'log_topic', webhookUrl: `${webhookBase}/api/bridge-webhook?code=${user.linkCode}` }
+                ];
+
+                try {
+                    const response = await fetch('https://universal-bridge.onrender.com/api/notify', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-api-key': UNIVERSAL_BRIDGE_API_KEY
+                        },
+                        body: JSON.stringify({
+                            targetUserId: user.appUserId,
+                            title: '📚 147 Study - Revisions Due!',
+                            body: `You have ${totalCount} topics waiting for your review.`,
+                            interactiveSchema: schema
+                        })
+                    });
+                    
+                    if (!response.ok) throw new Error(`Status ${response.status}`);
+                    notified++;
+                } catch (e) {
+                    console.error(`  ❌ Failed to notify app user ${user.linkCode}:`, e.message);
+                }
+
+            } else {
+                // Telegram specific payload
+                let msg = '📚 *147 Study — Today\'s Revisions*\n\n';
+                const d4Items = dueToday.filter(i => i.type === 'day4');
+                const d7Items = dueToday.filter(i => i.type === 'day7');
+
+                if (d4Items.length) {
+                    msg += '🟣 *Day 4 Revisions:*\n';
+                    d4Items.forEach(i => { msg += `  • ${i.entry.subject} — ${i.entry.topic}\n`; });
+                    msg += '\n';
+                }
+                if (d7Items.length) {
+                    msg += '🔵 *Day 7 Revisions:*\n';
+                    d7Items.forEach(i => { msg += `  • ${i.entry.subject} — ${i.entry.topic}\n`; });
+                    msg += '\n';
+                }
+                if (overdue.length) {
+                    msg += '🔴 *Overdue:*\n';
+                    overdue.forEach(i => { msg += `  • ${i.entry.subject} — ${i.entry.topic} (${i.days}d overdue)\n`; });
+                    msg += '\n';
+                }
+                msg += '💪 Good luck with your revisions!';
+
+                try {
+                    await bot.sendMessage(user.chatId, msg, { parse_mode: 'Markdown' });
+                    notified++;
+                } catch (e) {
+                    console.error(`  ❌ Failed to notify telegram user ${user.linkCode}:`, e.message);
+                }
             }
         }
 
@@ -368,6 +432,80 @@ app.get('/api/cron/notify', async (req, res) => {
     } catch (error) {
         console.error('Cron error:', error);
         res.status(500).json({ error: 'Notification failed' });
+    }
+});
+
+// ─── Universal Bridge Webhook Endpoint ────────
+
+app.post('/api/bridge-webhook', async (req, res) => {
+    const { code } = req.query;
+    const { action, data } = req.body;
+
+    if (!code) return res.status(400).json({ error: 'Missing code' });
+
+    console.log(`[Webhook] Received action '${action}' for linkCode '${code}'`);
+
+    try {
+        const user = await User.findOne({ linkCode: code });
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const today = getToday();
+
+        if (action === 'mark_done') {
+            const entries = await Entry.find({ linkCode: code });
+            let markedCount = 0;
+
+            for (const entry of entries) {
+                let saved = false;
+                if (entry.revisions.day4.dueDate <= today && !entry.revisions.day4.completed) {
+                    entry.revisions.day4.completed = true;
+                    entry.revisions.day4.completedAt = new Date();
+                    saved = true;
+                }
+                if (entry.revisions.day7.dueDate <= today && !entry.revisions.day7.completed) {
+                    entry.revisions.day7.completed = true;
+                    entry.revisions.day7.completedAt = new Date();
+                    saved = true;
+                }
+                if (saved) {
+                    await entry.save();
+                    markedCount++;
+                }
+            }
+            console.log(`[Webhook] Marked ${markedCount} revisions as done for ${code}`);
+            res.json({ success: true, message: `Marked ${markedCount} topics done.` });
+        } 
+        else if (action === 'log_topic') {
+            const subject = (data.subject || '').trim();
+            const topic = (data.topic || '').trim();
+            const notes = (data.notes || '').trim() === 'skip' ? '' : (data.notes || '').trim();
+
+            if (!subject || !topic) {
+                console.log('[Webhook] Missing subject or topic.');
+                return res.json({ success: false, message: 'Subject and Topic are required.' });
+            }
+
+            await Entry.create({
+                linkCode: code,
+                date: today,
+                subject: subject,
+                topic: topic,
+                notes: notes,
+                revisions: {
+                    day4: { dueDate: addDays(today, 3), completed: false, completedAt: null },
+                    day7: { dueDate: addDays(today, 6), completed: false, completedAt: null }
+                }
+            });
+
+            console.log(`[Webhook] Created new entry for ${code}: ${subject} - ${topic}`);
+            res.json({ success: true, message: `Topic logged successfully!` });
+        } else {
+            res.status(400).json({ error: 'Unknown action' });
+        }
+
+    } catch (err) {
+        console.error('Webhook processing error:', err);
+        res.status(500).json({ error: 'Error processing valid action' });
     }
 });
 

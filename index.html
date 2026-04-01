@@ -26,12 +26,12 @@
                     <span class="streak-count" id="streakCount">0</span>
                     <span class="streak-label">day streak</span>
                 </div>
-                <button class="telegram-btn" id="telegramBtn" title="Link Telegram">
+                <button class="telegram-btn" id="telegramBtn" title="Setup Alerts">
                     <span id="telegramIcon">📬</span>
-                    <span id="telegramLabel">Link Telegram</span>
+                    <span id="telegramLabel">Setup Alerts</span>
                 </button>
-                <button class="btn-logout" id="logoutBtn" title="Logout" style="display: none;">
-                    🚪 Logout
+                <button class="btn-logout" id="logoutBtn" title="Unlink" style="display: none;">
+                    🚪 Unlink
                 </button>
                 <button class="btn-danger-sm" id="deleteAccountBtn" title="Delete Account" style="display: none;">
                     🗑️
@@ -39,16 +39,49 @@
             </div>
         </header>
 
-        <!-- Telegram Banner (shown when not linked) -->
+        <!-- Setup Banner (shown when not linked) -->
         <div class="telegram-banner" id="telegramBanner">
             <div class="telegram-banner-content">
                 <span class="telegram-banner-icon">📬</span>
                 <div>
-                    <strong>Connect Telegram</strong>
-                    <p>Get daily revision reminders automatically at 8 AM!</p>
+                    <strong>Setup Daily Alerts</strong>
+                    <p>Get your revision reminders at 8 AM via Telegram or the Mobile App!</p>
                 </div>
             </div>
-            <button class="telegram-banner-btn" id="telegramBannerBtn">Link Now →</button>
+            <button class="telegram-banner-btn" id="telegramBannerBtn">Setup Now →</button>
+        </div>
+
+        <!-- Setup Alerts Modal -->
+        <div class="modal-overlay" id="setupModal">
+            <div class="modal">
+                <div class="modal-header">
+                    <h2>📬 Setup Daily Alerts</h2>
+                    <button class="modal-close" id="setupModalClose">×</button>
+                </div>
+                <div class="setup-options">
+                    <div class="setup-option" id="optTelegram">
+                        <div class="opt-icon">🚀</div>
+                        <div class="opt-text">
+                            <strong>Use Telegram Bot</strong>
+                            <div class="small-text">Quick & simple.</div>
+                        </div>
+                    </div>
+                    <div class="setup-option" id="optApp">
+                        <div class="opt-icon">📱</div>
+                        <div class="opt-text">
+                            <strong>Use Universal Bridge App</strong>
+                            <div class="small-text">Interactive push notifications.</div>
+                        </div>
+                    </div>
+                </div>
+                <div id="appSetupForm" style="display: none; margin-top: 15px;">
+                    <div class="form-group">
+                        <label for="appUserIdInput">Enter your App User ID:</label>
+                        <input type="text" id="appUserIdInput" placeholder="e.g. 1234abcd-..." />
+                    </div>
+                    <button class="btn-primary" id="saveAppIdBtn" style="width: 100%">Connect Mobile App</button>
+                </div>
+            </div>
         </div>
 
         <!-- Stats Bar -->
