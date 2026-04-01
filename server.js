@@ -12,67 +12,32 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
-// ─── Database Connection Pooling (Serverless) ──
-let cachedDb = null;
-async function connectToDatabase() {
-    if (mongoose.connection.readyState >= 1) return;
-    if (cachedDb) return cachedDb;
-    cachedDb = await mongoose.connect(process.env.MONGODB_URI);
-    console.log('✅ Connected to MongoDB (Cached)');
-    return cachedDb;
-}
-
-// Global DB Middleware
-app.use(async (req, res, next) => {
-    try {
-        await connectToDatabase();
-        next();
-    } catch (e) {
-        console.error('❌ MongoDB connection failed:', e);
-        res.status(500).json({ error: 'Database Connection Failed' });
-    }
-});
-
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const BOT_USERNAME = 'Edu147plannerbot';
-const RENDER_URL = process.env.RENDER_URL;
-const VERCEL_URL = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : process.env.PRODUCTION_URL;
-const PRODUCTION_URL = RENDER_URL || VERCEL_URL; // Support either Render or Vercel
+const RENDER_URL = process.env.RENDER_URL; // e.g., https://your-app.onrender.com
 const CRON_SECRET = process.env.CRON_SECRET || 'default-secret-change-me';
 const UNIVERSAL_BRIDGE_API_KEY = process.env.UNIVERSAL_BRIDGE_API_KEY;
 
 // ─── Telegram Bot Setup ──────────────────────
-// Use WEBHOOK mode in production, POLLING mode locally
+// Use WEBHOOK mode in production (Render), POLLING mode locally
 let bot;
 
-if (PRODUCTION_URL || process.env.VERCEL) {
-    // Production: Webhook mode (Serverless friendly)
+if (RENDER_URL) {
+    // Production: webhook mode — works even when server sleeps
+    // Telegram sends requests TO our server, which wakes it up
     bot = new TelegramBot(BOT_TOKEN);
     const webhookPath = `/bot${BOT_TOKEN}`;
-    
-    // Auto-set webhook if a URL is explicitly defined
-    if (PRODUCTION_URL) bot.setWebHook(`${PRODUCTION_URL}${webhookPath}`);
-    
+    bot.setWebHook(`${RENDER_URL}${webhookPath}`);
     app.post(webhookPath, (req, res) => {
         bot.processUpdate(req.body);
         res.sendStatus(200);
     });
-    console.log(`🤖 Telegram bot running in WEBHOOK mode`);
+    console.log('🤖 Telegram bot running in WEBHOOK mode');
 } else {
     // Local dev: polling mode
     bot = new TelegramBot(BOT_TOKEN, { polling: true });
     console.log('🤖 Telegram bot running in POLLING mode (dev)');
 }
-
-// ─── Webhook Setup Endpoint (For Vercel) ─────
-app.get('/api/set-webhook', (req, res) => {
-    if (!bot) return res.status(500).json({ error: 'Bot not initialized in webhook mode' });
-    const host = req.headers.host;
-    const url = `https://${host}/bot${BOT_TOKEN}`;
-    bot.setWebHook(url)
-       .then(() => res.json({ success: true, message: `Webhook set to ${url}` }))
-       .catch(e => res.status(500).json({ error: e.message }));
-});
 
 // Set bot menu commands
 bot.setMyCommands([
@@ -623,20 +588,18 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// ─── Start Server / Export ───────────────────
+// ─── Start Server ────────────────────────────
 
-if (process.env.VERCEL) {
-    // Vercel handles the port and execution natively
-    module.exports = app;
-} else {
-    // Standard Node.js environment (Local or Render)
-    connectToDatabase().then(() => {
+mongoose.connect(process.env.MONGODB_URI)
+    .then(() => {
+        console.log('✅ Connected to MongoDB');
         const PORT = process.env.PORT || 3000;
         app.listen(PORT, () => {
-             console.log(`🚀 Server running on port ${PORT}`);
+            console.log(`🚀 Server running on port ${PORT}`);
+            console.log(`📋 Mode: ${RENDER_URL ? 'PRODUCTION (webhook)' : 'DEVELOPMENT (polling)'}`);
         });
-    }).catch(err => {
-        console.error('Boot error:', err);
+    })
+    .catch(err => {
+        console.error('❌ MongoDB connection failed:', err.message);
         process.exit(1);
     });
-}
