@@ -20,30 +20,24 @@ const UNIVERSAL_BRIDGE_API_KEY = process.env.UNIVERSAL_BRIDGE_API_KEY;
 
 // ─── Telegram Bot Setup ──────────────────────
 // Use WEBHOOK mode in production (Render), POLLING mode locally
+// NOTE: Webhook & commands are set AFTER server starts listening (see bottom)
+//       so Render sees the port bind quickly and doesn't return hibernate-wake-error.
 let bot;
 
 if (RENDER_URL) {
-    // Production: webhook mode — works even when server sleeps
-    // Telegram sends requests TO our server, which wakes it up
+    // Production: webhook mode — no polling, no HTTP calls yet
     bot = new TelegramBot(BOT_TOKEN);
     const webhookPath = `/bot${BOT_TOKEN}`;
-    bot.setWebHook(`${RENDER_URL}${webhookPath}`);
     app.post(webhookPath, (req, res) => {
         bot.processUpdate(req.body);
         res.sendStatus(200);
     });
-    console.log('🤖 Telegram bot running in WEBHOOK mode');
+    console.log('🤖 Telegram bot created (webhook route registered)');
 } else {
     // Local dev: polling mode
     bot = new TelegramBot(BOT_TOKEN, { polling: true });
     console.log('🤖 Telegram bot running in POLLING mode (dev)');
 }
-
-// Set bot menu commands
-bot.setMyCommands([
-    { command: 'log', description: 'Log a new study topic' },
-    { command: 'cancel', description: 'Cancel current action' }
-]).catch(console.error);
 
 // ─── State Tracking for Bot ──────────────────
 const userStates = {};
@@ -602,17 +596,42 @@ app.get('*', (req, res) => {
 });
 
 // ─── Start Server ────────────────────────────
+// IMPORTANT: Bind to port FIRST so Render sees the service as alive immediately.
+// Then connect to MongoDB and set up Telegram webhook in the background.
+// This prevents hibernate-wake-error on Render free tier.
 
-mongoose.connect(process.env.MONGODB_URI)
-    .then(() => {
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, async () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📋 Mode: ${RENDER_URL ? 'PRODUCTION (webhook)' : 'DEVELOPMENT (polling)'}`);
+
+    // Now connect to MongoDB
+    try {
+        await mongoose.connect(process.env.MONGODB_URI);
         console.log('✅ Connected to MongoDB');
-        const PORT = process.env.PORT || 3000;
-        app.listen(PORT, () => {
-            console.log(`🚀 Server running on port ${PORT}`);
-            console.log(`📋 Mode: ${RENDER_URL ? 'PRODUCTION (webhook)' : 'DEVELOPMENT (polling)'}`);
-        });
-    })
-    .catch(err => {
+    } catch (err) {
         console.error('❌ MongoDB connection failed:', err.message);
         process.exit(1);
-    });
+    }
+
+    // Now set up Telegram webhook & commands (after port is bound)
+    if (RENDER_URL) {
+        try {
+            const webhookPath = `/bot${BOT_TOKEN}`;
+            await bot.setWebHook(`${RENDER_URL}${webhookPath}`);
+            console.log('🤖 Telegram webhook set successfully');
+        } catch (err) {
+            console.error('⚠️ Failed to set Telegram webhook:', err.message);
+        }
+    }
+
+    try {
+        await bot.setMyCommands([
+            { command: 'log', description: 'Log a new study topic' },
+            { command: 'cancel', description: 'Cancel current action' }
+        ]);
+    } catch (err) {
+        console.error('⚠️ Failed to set bot commands:', err.message);
+    }
+});
